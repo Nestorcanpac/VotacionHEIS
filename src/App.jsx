@@ -61,15 +61,11 @@ const PREMIOS = [
   }
 ]
 
-// Pantalla de votación para un premio
-function PremioScreen({ premio, personas, onSelect, selectedPerson, onNext }) {
+// Pantalla de selección de participante
+function SeleccionarParticipanteScreen({ personas, onSelect, loading }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [filteredPersonas, setFilteredPersonas] = useState(personas)
-
-  // Reiniciar búsqueda cuando cambia el premio
-  useEffect(() => {
-    setSearchTerm('')
-  }, [premio.letra])
+  const [selectedParticipante, setSelectedParticipante] = useState(null)
 
   useEffect(() => {
     if (!searchTerm.trim()) {
@@ -83,6 +79,107 @@ function PremioScreen({ premio, personas, onSelect, selectedPerson, onNext }) {
     )
     setFilteredPersonas(filtered)
   }, [searchTerm, personas])
+
+  const handleSelect = (persona) => {
+    setSelectedParticipante(persona)
+  }
+
+  const handleContinue = () => {
+    if (selectedParticipante) {
+      onSelect(selectedParticipante)
+    }
+  }
+
+  return (
+    <div className="seleccionar-participante-screen">
+      <div className="seleccionar-participante-content">
+        <div className="seleccionar-participante-header">
+          <h1 className="seleccionar-participante-title">Selecciona tu nombre</h1>
+          <p className="seleccionar-participante-subtitle">
+            Por favor, selecciona tu nombre de la lista para comenzar a votar
+          </p>
+        </div>
+
+        <div className="search-container">
+          <input
+            type="text"
+            className="search-input"
+            placeholder={loading ? "Cargando..." : "Buscar persona..."}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            disabled={loading}
+          />
+        </div>
+
+        {loading ? (
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Cargando participantes...</p>
+          </div>
+        ) : (
+          <div className="personas-list">
+            {filteredPersonas.length === 0 ? (
+              <p className="no-results">No se encontraron resultados</p>
+            ) : (
+              filteredPersonas.map((persona) => (
+                <div
+                  key={persona.id}
+                  className={`persona-item ${selectedParticipante?.id === persona.id ? 'selected' : ''}`}
+                  onClick={() => handleSelect(persona)}
+                >
+                  {persona.nombre}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {selectedParticipante && (
+          <div className="selected-person">
+            <p>Seleccionado: <strong>{selectedParticipante.nombre}</strong></p>
+          </div>
+        )}
+
+        <button
+          className="next-button"
+          onClick={handleContinue}
+          disabled={!selectedParticipante}
+        >
+          Continuar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Pantalla de votación para un premio
+function PremioScreen({ premio, personas, participanteActual, onSelect, selectedPerson, onNext }) {
+  const [searchTerm, setSearchTerm] = useState('')
+  
+  // Filtrar el participante actual de la lista
+  const personasDisponibles = personas.filter(
+    persona => persona.nombre !== participanteActual?.nombre
+  )
+  
+  const [filteredPersonas, setFilteredPersonas] = useState(personasDisponibles)
+
+  // Reiniciar búsqueda cuando cambia el premio
+  useEffect(() => {
+    setSearchTerm('')
+  }, [premio.letra])
+
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredPersonas(personasDisponibles)
+      return
+    }
+
+    const normalizedSearch = normalizeText(searchTerm)
+    const filtered = personasDisponibles.filter(persona =>
+      normalizeText(persona.nombre).includes(normalizedSearch)
+    )
+    setFilteredPersonas(filtered)
+  }, [searchTerm, personasDisponibles])
 
   const handleSelect = (persona) => {
     onSelect(persona)
@@ -298,7 +395,7 @@ function ResultadosScreen({ onBack }) {
 }
 
 // Pantalla de resumen final
-function ResumenScreen({ selecciones }) {
+function ResumenScreen({ selecciones, participanteActual }) {
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showResultados, setShowResultados] = useState(false)
 
@@ -319,6 +416,9 @@ function ResumenScreen({ selecciones }) {
     <div className="resumen-screen">
       <div className="resumen-content">
         <h1 className="resumen-title">Resumen de Votaciones</h1>
+        {participanteActual && (
+          <p className="resumen-participante">Votante: <strong>{participanteActual.nombre}</strong></p>
+        )}
         <div className="resumen-list">
           {PREMIOS.map((premio, index) => (
             <div key={premio.letra} className="resumen-item">
@@ -349,6 +449,9 @@ function ResumenScreen({ selecciones }) {
 // Componente principal de votación
 function VotacionFlow() {
   const [personas, setPersonas] = useState([])
+  const [loadingPersonas, setLoadingPersonas] = useState(true)
+  const [participanteActual, setParticipanteActual] = useState(null)
+  const [showSeleccionarParticipante, setShowSeleccionarParticipante] = useState(true)
   const [currentPremioIndex, setCurrentPremioIndex] = useState(0)
   const [selecciones, setSelecciones] = useState([])
   const [selectedPerson, setSelectedPerson] = useState(null)
@@ -356,37 +459,54 @@ function VotacionFlow() {
 
   useEffect(() => {
     async function getPersonas() {
-      // Asumiendo que hay una tabla 'personas' o 'candidatos' en la base de datos
-      // Si la tabla tiene otro nombre, hay que cambiarlo
-      const { data, error } = await supabase
-        .from('votaciones')
-        .select('nombre')
-        .order('nombre')
+      setLoadingPersonas(true)
+      try {
+        // Asumiendo que hay una tabla 'personas' o 'candidatos' en la base de datos
+        // Si la tabla tiene otro nombre, hay que cambiarlo
+        const { data, error } = await supabase
+          .from('votaciones')
+          .select('nombre')
+          .order('nombre')
 
-      if (error) {
+        if (error) {
+          console.error('Error al obtener personas:', error)
+          // Si no existe la tabla, usar datos de ejemplo
+          setPersonas([
+            { id: 1, nombre: 'Juan Pérez' },
+            { id: 2, nombre: 'María García' },
+            { id: 3, nombre: 'Carlos López' }
+          ])
+          return
+        }
+
+        if (data) {
+          // Obtener nombres únicos
+          const nombresUnicos = [...new Set(data.map(v => v.nombre))]
+          const personasList = nombresUnicos.map((nombre, index) => ({
+            id: index + 1,
+            nombre: nombre
+          }))
+          setPersonas(personasList)
+        }
+      } catch (error) {
         console.error('Error al obtener personas:', error)
-        // Si no existe la tabla, usar datos de ejemplo
         setPersonas([
           { id: 1, nombre: 'Juan Pérez' },
           { id: 2, nombre: 'María García' },
           { id: 3, nombre: 'Carlos López' }
         ])
-        return
-      }
-
-      if (data) {
-        // Obtener nombres únicos
-        const nombresUnicos = [...new Set(data.map(v => v.nombre))]
-        const personasList = nombresUnicos.map((nombre, index) => ({
-          id: index + 1,
-          nombre: nombre
-        }))
-        setPersonas(personasList)
+      } finally {
+        setLoadingPersonas(false)
       }
     }
 
     getPersonas()
   }, [])
+
+  const handleParticipanteSelect = (participante) => {
+    setParticipanteActual(participante)
+    setShowSeleccionarParticipante(false)
+  }
 
   const handleSelect = (persona) => {
     setSelectedPerson(persona)
@@ -457,8 +577,18 @@ function VotacionFlow() {
   }
 
 
+  if (showSeleccionarParticipante) {
+    return (
+      <SeleccionarParticipanteScreen
+        personas={personas}
+        onSelect={handleParticipanteSelect}
+        loading={loadingPersonas}
+      />
+    )
+  }
+
   if (showResumen) {
-    return <ResumenScreen selecciones={selecciones} />
+    return <ResumenScreen selecciones={selecciones} participanteActual={participanteActual} />
   }
 
   const currentPremio = PREMIOS[currentPremioIndex]
@@ -467,6 +597,7 @@ function VotacionFlow() {
     <PremioScreen
       premio={currentPremio}
       personas={personas}
+      participanteActual={participanteActual}
       onSelect={handleSelect}
       selectedPerson={selectedPerson}
       onNext={handleNext}
