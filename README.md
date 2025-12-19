@@ -28,23 +28,41 @@ npm run preview
 
 ## 🌐 GitHub Pages
 
-Este proyecto está configurado para desplegarse automáticamente en GitHub Pages.
+Este proyecto está configurado para desplegarse en GitHub Pages usando la rama `gh-pages`.
 
 ### Configuración inicial (solo la primera vez):
 
-1. Ve a tu repositorio en GitHub: https://github.com/Nestorcanpac/VotacionHEIS
-2. Ve a **Settings** → **Pages**
-3. En **Source**, selecciona **GitHub Actions**
-4. Guarda los cambios
+1. **Instalar dependencias:**
+   ```bash
+   npm install
+   ```
 
-### Despliegue automático:
+2. **Configurar variables de entorno:**
+   Asegúrate de tener el archivo `.env` con:
+   ```
+   VITE_SUPABASE_URL=https://nvnfavozhnpzeuwhmgka.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY=sb_publishable_QB1TLnP-I2tb7FuNK_N6RQ_VJER1N4W
+   ```
 
-Una vez configurado, cada vez que hagas push a la rama `main`, el proyecto se desplegará automáticamente.
+3. **Hacer el despliegue:**
+   ```bash
+   npm run deploy
+   ```
+
+4. **Configurar GitHub Pages:**
+   - Ve a tu repositorio: https://github.com/Nestorcanpac/VotacionHEIS
+   - Ve a **Settings** → **Pages**
+   - En **Source**, selecciona **Deploy from a branch**
+   - Selecciona la rama `gh-pages` y la carpeta `/ (root)`
+   - Guarda los cambios
+
+### Despliegue:
+
+Cada vez que quieras actualizar el sitio:
+```bash
+npm run deploy
+```
 
 La aplicación estará disponible en:
 **https://nestorcanpac.github.io/VotacionHEIS/**
-
-### Nota importante:
-
-Asegúrate de que el archivo `.env` con las variables de entorno de Supabase **NO** se suba al repositorio (ya está en `.gitignore`). Para GitHub Pages, necesitarás configurar las variables de entorno como secrets del repositorio o usar otro método para las variables de entorno en producción.
 
